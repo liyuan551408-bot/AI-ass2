@@ -1,99 +1,89 @@
-#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdlib>
+#include <iostream>
 #include "fuzzylogic.h"
+
+using namespace std;
 
 /////////////////////////////////////////////////////////////////
 
 //Initialise Fuzzy Rules
 
 void initFuzzyRules(fuzzy_system_rec *fl) {
-	
-   const int
-      no_of_x_rules = 25,
-      no_of_theta_rules = 25;
-   
-   int i;
-	
-//---------------------------------------------------------------------------- 	
-//THETA vs. THETA_DOT	
-//   
-   for (i = 0;i < no_of_theta_rules;i++) {
-       fl->rules[i].inp_index[0] = in_theta;
-       fl->rules[i].inp_index[1] = in_theta_dot;
-   }
-      
-   /* Regions for theta and theta_dot: */
-   //sample only
-   // fl->rules[0].inp_fuzzy_set[0] = in_nl;
-   // fl->rules[0].inp_fuzzy_set[1] = in_nl;
-   
-	
-	
-//----------------------------------------------------------------------------   
-//X vs. X_DOT
-//
-   for (i = 0;i < no_of_x_rules;i++) {
-   	  fl->rules[i + no_of_theta_rules].inp_index[0] = in_x;
-   	  fl->rules[i + no_of_theta_rules].inp_index[1] = in_x_dot;
-	}
-	  
-	/* Regions for x and x_dot: */
-   //sample only
-   // fl->rules[25+0].inp_fuzzy_set[0] = in_nl;
-   // fl->rules[25+0].inp_fuzzy_set[1] = in_nl;
-   
-   //and so on, and so forth...
+	// main.cpp supplies Yamakawa-style combined inputs:
+	// INPUT_X = A * theta + B * theta_dot
+	// INPUT_Y = C * x     + D * x_dot
+	// Build one complete 5-by-5 rule table over those two inputs.
+	int rule_index = 0;
+	for (int x_set = 0; x_set < fl->no_of_inp_regions; ++x_set) {
+		for (int y_set = 0; y_set < fl->no_of_inp_regions; ++y_set) {
+			rule& current = fl->rules[rule_index++];
+			current.inp_index[0] = INPUT_X;
+			current.inp_index[1] = INPUT_Y;
+			current.inp_fuzzy_set[0] = x_set;
+			current.inp_fuzzy_set[1] = y_set;
 
-   // fl->rules[25+24].out_fuzzy_set = out_nl;
-      return;
+			// Positive pole error requests positive force. Positive cart error
+			// requests negative force. The difference spans all nine outputs.
+			current.out_fuzzy_set = out_ze + x_set - y_set;
+		}
+	}
 }
 
 
 void initMembershipFunctions(fuzzy_system_rec *fl) {
-	
-   /* The X membership functions */
-
-   //Sample routines only, to give you an idea of what to do here
-  	//~ fl->inp_mem_fns[in_x][in_neg] = init_trapz (-1.5,-0.5,0,0,left_trapezoid);
-   //~ fl->inp_mem_fns[in_x][in_ze] = init_trapz (-1.5,-0.5,0.5,1.5,regular_trapezoid);
-   //~ fl->inp_mem_fns[in_x][in_pos] = init_trapz (0.5,1.5,0,0,right_trapezoid);
-	
-   /* The X dot membership functions */
-   //enter the appropriate membership function initialisations here 
-
-   /* The theta membership functions */
-   //enter the appropriate membership function initialisations here
-  	
-   /* The theta dot membership functions */
-   //enter the appropriate membership function initialisations here
-  	
-
-	
-	
-   return;
+	// Both combined inputs use the same normalized universe. The left and
+	// right shoulder sets also cover values outside [-2, 2].
+	for (int input = 0; input < fl->no_of_inputs; ++input) {
+		fl->inp_mem_fns[input][in_nl] =
+			init_trapz(-2.0f, -1.0f, 0.0f, 0.0f, left_trapezoid);
+		fl->inp_mem_fns[input][in_ns] =
+			init_trapz(-2.0f, -1.0f, -0.5f, 0.0f, regular_trapezoid);
+		fl->inp_mem_fns[input][in_ze] =
+			init_trapz(-1.0f, -0.5f, 0.5f, 1.0f, regular_trapezoid);
+		fl->inp_mem_fns[input][in_ps] =
+			init_trapz(0.0f, 0.5f, 1.0f, 2.0f, regular_trapezoid);
+		fl->inp_mem_fns[input][in_pl] =
+			init_trapz(1.0f, 2.0f, 0.0f, 0.0f, right_trapezoid);
+	}
 }
 
 void initFuzzySystem (fuzzy_system_rec *fl) {
 
-   //Note: The settings of these parameters will depend upon your fuzzy system design
-   fl->no_of_inputs = 2;  /* Inputs are handled 2 at a time only */
-   fl->no_of_rules = 50;
-   fl->no_of_inp_regions = 5;
-   fl->no_of_outputs = 9;
-	
-   coefficient_A=1.0;
-   coefficient_B=1.0;
-   coefficient_C=1.0;
-   coefficient_D=1.0;
-	
-	//Sample only
-	// fl->output_values [out_nvl]=-95.0;
-	// fl->output_values [out_nl] = -85.0;
-   
+	// The controller consumes the two combined inputs produced in main.cpp.
+	fl->no_of_inputs = 2;
+	fl->no_of_rules = 25;
+	fl->no_of_inp_regions = 5;
+	fl->no_of_outputs = 9;
 
-   fl->rules = (rule *) malloc ((size_t)(fl->no_of_rules*sizeof(rule)));
-   initFuzzyRules(fl);
-   initMembershipFunctions(fl);
-   return;
+	// Initial input scaling; tune these together with the membership ranges
+	// after observing the simulation.
+	coefficient_A = 1.3f;
+	coefficient_B = 0.35f;
+	coefficient_C = 0.6f;
+	coefficient_D = 0.25f;
+
+	// Nine symmetric force levels, aligned with NVL through PVL.
+	for (int output = 0; output < fl->no_of_outputs; ++output) {
+		fl->output_values[output] = -7.0f + 1.75f * output;
+	}
+
+	// The global fuzzy system is zero-initialized. Release an earlier rule
+	// table if this initializer is called again.
+	if (fl->allocated && fl->rules != NULL) {
+		free(fl->rules);
+	}
+	fl->rules = static_cast<rule *>(malloc(
+		static_cast<size_t>(fl->no_of_rules) * sizeof(rule)));
+	fl->allocated = (fl->rules != NULL);
+	if (!fl->allocated) {
+		fl->no_of_rules = 0;
+		return;
+	}
+
+	initFuzzyRules(fl);
+	initMembershipFunctions(fl);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -204,7 +194,7 @@ float fuzzy_system (float inputs[],fuzzy_system_rec fz) {
  
 	
 	if (fabs(sum2) < TOO_SMALL) {
-      cout << "\r\nFLPRCS Error: Sum2 in fuzzy_system is 0.  Press key: " << endl;
+	  cout << "\r\nFLPRCS Error: Sum2 in fuzzy_system is 0.  Press key: " << endl;
       //~ getch();
       //~ exit(1);
       return 0.0;
@@ -215,11 +205,10 @@ float fuzzy_system (float inputs[],fuzzy_system_rec fz) {
 
 //////////////////////////////////////////////////////////////////////////////
 void free_fuzzy_rules (fuzzy_system_rec *fz) {
-   if (fz->allocated){
-	   free (fz->rules);
+	if (fz->allocated && fz->rules != NULL) {
+		free(fz->rules);
 	}
-	
-   fz->allocated = false;
-   return;
+	fz->rules = NULL;
+	fz->allocated = false;
 }
 

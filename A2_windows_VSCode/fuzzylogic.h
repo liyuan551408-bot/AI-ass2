@@ -1,20 +1,6 @@
 #ifndef __FUZZYLOGIC_H__
 #define __FUZZYLOGIC_H__
 
-#include <math.h>
-#include <set>
-#include <stack>
-#include <ctime>
-#include <string>
-#include <iostream>
-#include <algorithm>
-#include <vector>
-#include <deque>
-#include <set>
-
-
-using namespace std;
-
 /////////////////////////////////////////////////////
 
 #define MAX_NO_OF_INPUTS 5
@@ -61,12 +47,6 @@ extern fuzzy_system_rec g_fuzzy_system;
 extern float coefficient_A, coefficient_B, coefficient_C, coefficient_D;
 
 //---------------------------------------------------------------------------
-
-trapezoid init_trapz (float x1,float x2,float x3,float x4, trapz_type typ);
-float fuzzy_system (float inputs[],fuzzy_system_rec fl);
-void free_fuzzy_rules (fuzzy_system_rec *fz);
-
-//-------------------------------------------------------------------------
 void initFuzzyRules(fuzzy_system_rec *fl);
 void initMembershipFunctions(fuzzy_system_rec *fl); 
 void initFuzzySystem (fuzzy_system_rec *fl);
