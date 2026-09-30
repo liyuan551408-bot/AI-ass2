@@ -1,0 +1,54 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build using Makefile",
+            "type": "shell",
+            "command": "C:\\gcc\\bin\\mingw32-make.exe",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "C:\\gcc\\bin;${env:PATH}"
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "clear": false
+            }
+        },
+        {
+            "label": "Clean",
+            "type": "shell",
+            "command": "C:\\gcc\\bin\\mingw32-make.exe",
+            "args": [
+                "clean"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "PATH": "C:\\gcc\\bin;${env:PATH}"
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Rebuild",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Clean",
+                "Build using Makefile"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
