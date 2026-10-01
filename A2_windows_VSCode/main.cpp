@@ -30,6 +30,8 @@
 #include <vector>
 #include <chrono>
 #include <sstream>
+#include <iomanip>
+#include <stdexcept>
 
 
 #include "sprites.h" 
@@ -90,6 +92,7 @@ struct DataSetType{
 DataSetType dataSet;
 
 int NUM_OF_DATA_POINTS;
+const float PI = 3.14159265358979323846f;
 
 // Function Prototypes ////////////////////////////////////////////////////////////////////
 
@@ -260,7 +263,7 @@ void displayInfo(const WorldStateType& s, const string msg="", const string time
 
 void runInvertedPendulum(){
 	
-	using std::chrono::system_clock;
+	using std::chrono::steady_clock;
 
 	// float inputs[4];
 	float inputs[2];  //Yamakawa
@@ -301,10 +304,13 @@ void runInvertedPendulum(){
 	
 	
     initFuzzySystem(&g_fuzzy_system);	
+	if (!g_fuzzy_system.allocated) {
+		throw runtime_error("Unable to allocate fuzzy controller rules.");
+	}
 	
 	//~ display_All_MF (g_fuzzy_system);
     //~ getch();
-	system_clock::time_point start; //= std::chrono::system_clock::now();
+	steady_clock::time_point start;
 	
     string msg;
     bool exitFlag=false;
@@ -312,43 +318,50 @@ void runInvertedPendulum(){
     
     float input_angle=0;
 
-    bool done = false;
-
-        while(!done){
+        while(true){
         	exitFlag=false;
+            msg.clear();
             
             prevState.init();
+            newState.init();
         	prevState.x = 1.0;
 
 		    cout << "Enter initial angle [-60, 60], (to exit, leave it blank): ";
 		    
 
-		    input_angle=-90;
-
 		    std::string input;
-		    std::getline( std::cin, input );
-		    if ( !input.empty() ) {
-		        std::istringstream stream( input );
-		        stream >> input_angle;
+		    if (!std::getline(std::cin, input) ||
+		        input.find_first_not_of(" \t\r\n") == string::npos) {
+		        break;
 		    }
-		    
-
-		    if( (input_angle < -60) || (input_angle > 60) ){
-		    	done = true;
+		    std::istringstream stream(input);
+		    if (!(stream >> input_angle)) {
+		        cout << "Please enter a number in [-60, 60]." << endl;
+		        continue;
+		    }
+		    stream >> std::ws;
+		    if (!stream.eof() || !std::isfinite(input_angle) ||
+		        input_angle < -60.0f || input_angle > 60.0f) {
+		        cout << "Please enter a number in [-60, 60]." << endl;
+		        continue;
 		    }
 
 		    if(input_angle == 0.0){ //perturb by 0.1 degrees if initial angle is set to 0
-		    	input_angle = 0.1 * (3.14/180); 
+		        input_angle = 0.1f * (PI / 180.0f);
 		    } else {
-		    	input_angle = input_angle * (3.14/180);
+		        input_angle = input_angle * (PI / 180.0f);
 		    }
 
 
 		    prevState.angle = input_angle;
+		    newState.x = prevState.x;
+		    newState.angle = prevState.angle;
 
-			start = std::chrono::system_clock::now();
+			start = steady_clock::now();
+			double simulationTime = 0.0;
+			cout << "Left/Right: apply a disturbance; Esc: end this trial." << endl;
 
-			while(GetAsyncKeyState(VK_ESCAPE) == 0) {
+			while((GetAsyncKeyState(VK_ESCAPE) & 0x8000) == 0) {
 
 		         setactivepage(page);
 		         cleardevice();
@@ -364,9 +377,8 @@ void runInvertedPendulum(){
 				 inputs[INPUT_X] = (coefficient_A * prevState.angle) + (coefficient_B * prevState.angle_dot);
 				 inputs[INPUT_Y] = (coefficient_C * prevState.x) + (coefficient_D * prevState.x_dot);
 				
-		         //1) Enable this only after your fuzzy system has been completed already.
-		         //Remember, you need to define the rules, membership function parameters and rule outputs.
-		         //prevState.F = fuzzy_system(inputs, g_fuzzy_system); //call the fuzzy controller
+		         // Calculate a fresh automatic force at every simulation step.
+		         prevState.F = fuzzy_system(inputs, g_fuzzy_system);
 				 
 				 externalForce=0.0;
 				 externalForce = getKey(); //manual operation
@@ -419,6 +431,7 @@ void runInvertedPendulum(){
 				 // END - DYNAMICS OF THE SYSTEM
 				 // **************************************************************************
 				 //---------------------------------------------------------------------------
+				 simulationTime += h;
 				 
 
 				 if((prevState.x < (-2.4 + 0.3)) || (prevState.x > (2.4-0.3))){
@@ -448,11 +461,17 @@ void runInvertedPendulum(){
 		         }
 		   }
 
-    auto end = std::chrono::system_clock::now();
+    auto end = steady_clock::now();
 
 	std::chrono::duration<double> elapsed_seconds = end-start;
-    string timeStr = to_string(elapsed_seconds.count()); 
-    timeStr = timeStr + " sec.";
+	if (!exitFlag) {
+		msg = "Trial stopped (Esc).";
+	}
+	ostringstream timing;
+	timing << fixed << setprecision(2) << simulationTime << " sim. sec.";
+	string timeStr = timing.str();
+	cout << msg << " Simulation time: " << simulationTime
+	     << " sec.; elapsed time: " << elapsed_seconds.count() << " sec." << endl;
 	
 	// cout << "timeElapsed = " << elapsed_seconds.count() << endl;
 	displayInfo(newState, msg, timeStr);         	
@@ -462,8 +481,7 @@ void runInvertedPendulum(){
 
 		
 	
-    //2) Enable this only after your fuzzy system has been completed already.
-	//free_fuzzy_rules(&g_fuzzy_system);
+	free_fuzzy_rules(&g_fuzzy_system);
 }
 
 
@@ -492,6 +510,9 @@ void generateControlSurface_Angle_vs_Angle_Dot(){
 	
 		
     initFuzzySystem(&g_fuzzy_system);	
+	if (!g_fuzzy_system.allocated) {
+		throw runtime_error("Unable to allocate fuzzy controller rules.");
+	}
 	
 	
     float angle_increment;
@@ -518,20 +539,22 @@ void generateControlSurface_Angle_vs_Angle_Dot(){
 //---------------------------------    
     minAngleDot= -3.0;
     maxAngleDot=  3.0;
-    angle_dot_increment=(maxAngleDot-minAngleDot)/float(NUM_OF_DATA_POINTS);
+    angle_dot_increment=(maxAngleDot-minAngleDot)/float(NUM_OF_DATA_POINTS - 1);
     angle_dot=minAngleDot;
 //---------------------------------
-    minAngle=(-40.0)*3.14/180.0;
-    maxAngle=(40.0)*3.14/180.0;
-    angle_increment=(maxAngle-minAngle)/float(NUM_OF_DATA_POINTS);   
+    minAngle=(-40.0f)*PI/180.0f;
+    maxAngle=(40.0f)*PI/180.0f;
+    angle_increment=(maxAngle-minAngle)/float(NUM_OF_DATA_POINTS - 1);
 
 //---------------------------------
     for(int row=0; row < NUM_OF_DATA_POINTS; row++){
+         angle_dot = minAngleDot + row * angle_dot_increment;
     	 dataSet.y[row] = angle_dot;
          prevState.angle_dot = angle_dot;
          angle=minAngle;
 
          for(int col=0; col < NUM_OF_DATA_POINTS; col++){
+             angle = minAngle + col * angle_increment;
              prevState.x=0.0;
 		     prevState.x_dot=0.0;
 		     prevState.x_double_dot = 0.0;
@@ -579,10 +602,7 @@ void generateControlSurface_Angle_vs_Angle_Dot(){
 	         prevState.F = fuzzy_system(inputs, g_fuzzy_system);
 			 dataSet.z[row][col] = prevState.F; //record Force calculated
 			 
-	//Set next case to examine; increment data points		 
-          angle = angle + angle_increment;    
       }
-      angle_dot = angle_dot + angle_dot_increment;		 
    }	
    
    free_fuzzy_rules(&g_fuzzy_system);
@@ -596,30 +616,23 @@ void generateControlSurface_Angle_vs_Angle_Dot(){
 void saveDataToFile(string fileName){
 	cout << "Saving control surface to file: " << fileName << "..." << endl;
 	ofstream myfile;
-	myfile.open (fileName, std::ofstream::out | std::ofstream::app);
+	myfile.exceptions(ofstream::failbit | ofstream::badbit);
+	myfile.open(fileName.c_str(), std::ofstream::out | std::ofstream::trunc);
+	myfile << setprecision(9);
 	
-	//Column Header
+	// Excel surface layout: columns = angle (rad), rows = angular velocity
+	// (rad/s), cells = force (N). Clear the top-left zero in Excel before plotting.
+	myfile << "0.00";
 	for(int col=0; col < NUM_OF_DATA_POINTS; col++){
-		if(col == 0){
-		    myfile << "0.00, " << dataSet.x[col] << ",";
-		} else if (col < (NUM_OF_DATA_POINTS-2)) {
-			myfile << dataSet.x[col] << ",";
-		} else {
-			myfile << dataSet.x[col] << ",";
-		}
+		myfile << "," << dataSet.x[col];
 	}
-	myfile << endl;
+	myfile << '\n';
 	for(int row=0; row < NUM_OF_DATA_POINTS; row++){
+	  myfile << dataSet.y[row];
 	  for(int col=0; col < NUM_OF_DATA_POINTS; col++){
-		  if(col == 0){			  
-			  myfile << dataSet.y[row] << ", " << dataSet.z[row][col] << ","; //with Row header
-		  }else if(col < (NUM_OF_DATA_POINTS-2)) {			  
-           myfile << dataSet.z[row][col] << ",";
-		  } else {
-			  myfile << dataSet.z[row][col] << ",";
-		  }
+		  myfile << "," << dataSet.z[row][col];
      }
-	  myfile << endl;
+	  myfile << '\n';
    }
  
    myfile.close();
@@ -628,18 +641,10 @@ void saveDataToFile(string fileName){
 }
 
 void clearDataSet(){
-	
-	//Column Header
-   for(int col=0; col < NUM_OF_DATA_POINTS; col++){
-		dataSet.x[col] = 0.0;		    
-   }
-	
-   for(int row=0; row < NUM_OF_DATA_POINTS; row++){
-   	  dataSet.y[row] = 0.0;	
-	  for(int col=0; col < NUM_OF_DATA_POINTS; col++){		  
-		  dataSet.z[row][col] = 0.0;		  
-     }	
-   }   
+	dataSet.x.clear();
+	dataSet.y.clear();
+	dataSet.z.clear();
+	NUM_OF_DATA_POINTS = 0;
    cout << "DataSet cleared." << endl;
 	
 }
@@ -652,20 +657,31 @@ int main(void) {
    int graphDriver = 0,graphMode = 0;
    
    initgraph(&graphDriver, &graphMode, "", 800, 600); // Start Window
+   int graphicsError = graphresult();
+   if (graphicsError != grOk) {
+       cerr << "Graphics initialization failed: "
+            << grapherrormsg(graphicsError) << endl;
+       return EXIT_FAILURE;
+   }
    clearDataSet();
+   int status = EXIT_SUCCESS;
    try{
 		runInvertedPendulum();
 	
-		//3) Enable this only after your fuzzy system has been completed already.
-		//generateControlSurface_Angle_vs_Angle_Dot();
+		generateControlSurface_Angle_vs_Angle_Dot();
+		saveDataToFile("data_angle_vs_angle_dot.txt");
 		
-		//4) Enable this only after your fuzzy system has been completed already.
-		//saveDataToFile("data_angle_vs_angle_dot.txt");
-		
+   }
+   catch(const std::exception& error){
+       cerr << "Error: " << error.what() << endl;
+       status = EXIT_FAILURE;
    }
    catch(...){
-    	cout << "Exception caught!\n";
+       cerr << "Unexpected error." << endl;
+       status = EXIT_FAILURE;
    }
-	return 0;
+   free_fuzzy_rules(&g_fuzzy_system);
+   closegraph();
+	return status;
 } 
 
