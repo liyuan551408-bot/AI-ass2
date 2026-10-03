@@ -5,7 +5,7 @@
 
 #define MAX_NO_OF_INPUTS 5
 #define MAX_NO_OF_INP_REGIONS 5
-#define MAX_NO_OF_OUTPUT_VALUES 9
+#define MAX_NO_OF_OUTPUT_VALUES 7
 
 #define TOO_SMALL 1e-6
 
@@ -17,10 +17,10 @@ enum {INPUT_X, INPUT_Y};
 enum {in_theta,in_theta_dot,in_x,in_x_dot};
 
 //Fuzzy sets
-enum {in_nl,in_ns,in_ze,in_ps, in_pl};
+enum {in_nm,in_ns,in_ze,in_ps,in_pm};
 
 //Fuzzy output terms
-enum {out_nvl,out_nl,out_nm, out_ns, out_ze,out_ps, out_pm,out_pl, out_pvl};
+enum {out_nl,out_nm,out_ns,out_ze,out_ps,out_pm,out_pl};
 
 
 typedef struct {

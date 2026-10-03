@@ -14,7 +14,17 @@ void initFuzzyRules(fuzzy_system_rec *fl) {
 	// main.cpp supplies Yamakawa-style combined inputs:
 	// INPUT_X = A * theta + B * theta_dot
 	// INPUT_Y = C * x     + D * x_dot
-	// Build one complete 5-by-5 rule table over those two inputs.
+	// Yamakawa (1993), Fig. 29(a), printed page 516: retain all 13
+	// specified cells, including the bracketed NL/PL disturbance rules.
+	// Fill the other 12 cells symmetrically between neighboring conclusions.
+	// Rows: X = NM, NS, ZR, PS, PM; columns: Y in the same order.
+	const short output_table[5][5] = {
+		{out_nl, out_nl, out_nm, out_nm, out_ns},
+		{out_nm, out_nm, out_ns, out_ns, out_ze},
+		{out_ns, out_ns, out_ze, out_ps, out_ps},
+		{out_ze, out_ps, out_ps, out_pm, out_pm},
+		{out_ps, out_pm, out_pm, out_pl, out_pl}
+	};
 	int rule_index = 0;
 	for (int x_set = 0; x_set < fl->no_of_inp_regions; ++x_set) {
 		for (int y_set = 0; y_set < fl->no_of_inp_regions; ++y_set) {
@@ -24,9 +34,7 @@ void initFuzzyRules(fuzzy_system_rec *fl) {
 			current.inp_fuzzy_set[0] = x_set;
 			current.inp_fuzzy_set[1] = y_set;
 
-			// Positive pole error requests positive force. Positive cart error
-			// requests negative force. The difference spans all nine outputs.
-			current.out_fuzzy_set = out_ze + x_set - y_set;
+			current.out_fuzzy_set = output_table[x_set][y_set];
 		}
 	}
 }
@@ -36,15 +44,15 @@ void initMembershipFunctions(fuzzy_system_rec *fl) {
 	// Both combined inputs use the same normalized universe. The left and
 	// right shoulder sets also cover values outside [-2, 2].
 	for (int input = 0; input < fl->no_of_inputs; ++input) {
-		fl->inp_mem_fns[input][in_nl] =
+		fl->inp_mem_fns[input][in_nm] =
 			init_trapz(-2.0f, -1.0f, 0.0f, 0.0f, left_trapezoid);
 		fl->inp_mem_fns[input][in_ns] =
-			init_trapz(-2.0f, -1.0f, -0.5f, 0.0f, regular_trapezoid);
+			init_trapz(-2.0f, -1.0f, -1.0f, 0.0f, regular_trapezoid);
 		fl->inp_mem_fns[input][in_ze] =
-			init_trapz(-1.0f, -0.5f, 0.5f, 1.0f, regular_trapezoid);
+			init_trapz(-1.0f, 0.0f, 0.0f, 1.0f, regular_trapezoid);
 		fl->inp_mem_fns[input][in_ps] =
-			init_trapz(0.0f, 0.5f, 1.0f, 2.0f, regular_trapezoid);
-		fl->inp_mem_fns[input][in_pl] =
+			init_trapz(0.0f, 1.0f, 1.0f, 2.0f, regular_trapezoid);
+		fl->inp_mem_fns[input][in_pm] =
 			init_trapz(1.0f, 2.0f, 0.0f, 0.0f, right_trapezoid);
 	}
 }
@@ -55,18 +63,21 @@ void initFuzzySystem (fuzzy_system_rec *fl) {
 	fl->no_of_inputs = 2;
 	fl->no_of_rules = 25;
 	fl->no_of_inp_regions = 5;
-	fl->no_of_outputs = 9;
+	fl->no_of_outputs = 7;
 
-	// Initial input scaling; tune these together with the membership ranges
-	// after observing the simulation.
-	coefficient_A = 1.3f;
-	coefficient_B = 0.35f;
-	coefficient_C = 0.6f;
-	coefficient_D = 0.25f;
+	// Calibrated for the unmodified starter dynamics, h=0.002 s, x(0)=1 m.
+	// Angle and angular velocity are supplied in radians and radians/sec.
+	coefficient_A = 3.9f;
+	coefficient_B = 0.45f;
+	coefficient_C = 0.2f;
+	coefficient_D = 0.6f;
 
-	// Nine symmetric force levels, aligned with NVL through PVL.
+	// Paper labels NL, NM, NS, ZR, PS, PM, PL become Sugeno force
+	// singletons in this assignment (the paper drives cart velocity).
+	// Force calibration is permitted by requirement 3; no actuator limit
+	// is prescribed. The earlier +/-7 N levels were a design choice.
 	for (int output = 0; output < fl->no_of_outputs; ++output) {
-		fl->output_values[output] = -7.0f + 1.75f * output;
+		fl->output_values[output] = -180.0f + 60.0f * output;
 	}
 
 	// The global fuzzy system is zero-initialized. Release an earlier rule

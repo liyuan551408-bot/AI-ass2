@@ -93,6 +93,7 @@ DataSetType dataSet;
 
 int NUM_OF_DATA_POINTS;
 const float PI = 3.14159265358979323846f;
+const float INITIAL_CART_X = 1.0f;
 
 // Function Prototypes ////////////////////////////////////////////////////////////////////
 
@@ -290,16 +291,16 @@ void runInvertedPendulum(){
 	//Rod rod(0.0, worldBoundary.y2 + 0.06);
 	//-------------------------------------------------
 	
-	//Start somewhere on the left
+	// The assignment characterises controller performance at x=1 m.
 	//Cart cart(-1.0, worldBoundary.y2 + 0.06);
-	Cart cart(1.0, worldBoundary.y2 + 0.125);
+	Cart cart(INITIAL_CART_X, worldBoundary.y2 + 0.125);
 	//Rod rod(-1.0, worldBoundary.y2 + 0.06);
-	Rod rod(1.0, worldBoundary.y2 + 0.125 + 0.35);
+	Rod rod(INITIAL_CART_X, worldBoundary.y2 + 0.125 + 0.35);
 	
 	//---------------------------------------------------------------
     //***************************************************************
     //Set the initial angle of the pole with respect to the vertical
-    prevState.x = 1.0;
+    prevState.x = INITIAL_CART_X;
 	prevState.angle = 25.0 * (3.14/180);  //initial angle  = 35 degrees
 	
 	
@@ -324,7 +325,7 @@ void runInvertedPendulum(){
             
             prevState.init();
             newState.init();
-        	prevState.x = 1.0;
+            prevState.x = INITIAL_CART_X;
 
 		    cout << "Enter initial angle [-60, 60], (to exit, leave it blank): ";
 		    
@@ -399,7 +400,7 @@ void runInvertedPendulum(){
 				 newState.angle_dot = prevState.angle_dot + (h * newState.angle_double_dot); 
 				 newState.angle = prevState.angle + (h * newState.angle_dot);
 				 newState.F = prevState.F;				 
-				 newState.x_double_dot = calc_horizontal_acceleration(prevState); 
+				 newState.x_double_dot = calc_horizontal_acceleration(prevState);
 				 newState.x_dot = prevState.x_dot + (h * newState.x_double_dot);
 		         newState.x = prevState.x + (h * newState.x_dot);
 
@@ -584,7 +585,7 @@ void generateControlSurface_Angle_vs_Angle_Dot(){
 			
 			 //Updating x
 					 
-			 newState.x_double_dot = calc_horizontal_acceleration(prevState); 
+			 newState.x_double_dot = calc_horizontal_acceleration(prevState);
 			 newState.x_dot = prevState.x_dot + (h * newState.x_double_dot);
 	         newState.x = prevState.x + (h * newState.x_dot);
 
