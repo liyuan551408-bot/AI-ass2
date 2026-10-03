@@ -94,6 +94,29 @@ DataSetType dataSet;
 int NUM_OF_DATA_POINTS;
 const float PI = 3.14159265358979323846f;
 const float INITIAL_CART_X = 1.0f;
+const float SWAY_AMPLITUDE = 1.0f;
+const float SWAY_PERIOD = 12.0f;
+const float SWAY_DURATION = 48.0f;
+
+void swayTarget(double time, float& position, float& velocity) {
+    if (time >= SWAY_DURATION) {
+        position = 0.0f;
+        velocity = 0.0f;
+        return;
+    }
+    const float omega = 2.0f * PI / SWAY_PERIOD;
+    // Introduce the moving target smoothly while the initial lean is caught.
+    const float decay = exp(-time / 3.0);
+    const float ramp = 1.0f - decay;
+    // Reduce the excursion smoothly to zero, then hold the centre.
+    const float envelope = 0.5f * (1.0f + cos(PI * time / SWAY_DURATION));
+    const float envelopeDot = -0.5f * PI / SWAY_DURATION
+                              * sin(PI * time / SWAY_DURATION);
+    position = SWAY_AMPLITUDE * ramp * envelope * cos(omega * time);
+    velocity = SWAY_AMPLITUDE * ((decay / 3.0f * envelope + ramp * envelopeDot)
+                                * cos(omega * time)
+                                - ramp * envelope * omega * sin(omega * time));
+}
 
 // Function Prototypes ////////////////////////////////////////////////////////////////////
 
@@ -360,7 +383,7 @@ void runInvertedPendulum(){
 
 			start = steady_clock::now();
 			double simulationTime = 0.0;
-			cout << "Left/Right: apply a disturbance; Esc: end this trial." << endl;
+			cout << "Damped left/right sway, then settle at the centre. Left/Right: apply a disturbance; Esc: end this trial." << endl;
 
 			while((GetAsyncKeyState(VK_ESCAPE) & 0x8000) == 0) {
 
@@ -376,7 +399,10 @@ void runInvertedPendulum(){
 
 
 				 inputs[INPUT_X] = (coefficient_A * prevState.angle) + (coefficient_B * prevState.angle_dot);
-				 inputs[INPUT_Y] = (coefficient_C * prevState.x) + (coefficient_D * prevState.x_dot);
+				 float targetX, targetVelocity;
+				 swayTarget(simulationTime, targetX, targetVelocity);
+				 inputs[INPUT_Y] = coefficient_C * (prevState.x - targetX)
+				                   + coefficient_D * (prevState.x_dot - targetVelocity);
 				
 		         // Calculate a fresh automatic force at every simulation step.
 		         prevState.F = fuzzy_system(inputs, g_fuzzy_system);
