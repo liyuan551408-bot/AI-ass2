@@ -67,17 +67,21 @@ void initFuzzySystem (fuzzy_system_rec *fl) {
 
 	// Calibrated for the unmodified starter dynamics, h=0.002 s, x(0)=1 m.
 	// Angle and angular velocity are supplied in radians and radians/sec.
-	coefficient_A = 3.9f;
-	coefficient_B = 0.45f;
-	coefficient_C = 0.2f;
-	coefficient_D = 0.6f;
+	// Calibrated for sustained +/-60 N external pushes.
+	// The starter's protected dynamics and the Yamakawa rule table are unchanged.
+	coefficient_A = 9.92f;
+	coefficient_B = 1.49f;
+	coefficient_C = 0.95f;
+	coefficient_D = 1.81f;
 
 	// Paper labels NL, NM, NS, ZR, PS, PM, PL become Sugeno force
 	// singletons in this assignment (the paper drives cart velocity).
-	// Force calibration is permitted by requirement 3; no actuator limit
-	// is prescribed. The earlier +/-7 N levels were a design choice.
+	// At X=0 the rule table can produce only NS/ZR/PS outputs. NS/PS must
+	// therefore exceed the +/-60 N disturbance for an upright equilibrium.
+	// Nonuniform spacing keeps that reserve without tripling the extreme force.
+	const float forceLevels[7] = {-120.0f, -90.0f, -70.0f, 0.0f, 70.0f, 90.0f, 120.0f};
 	for (int output = 0; output < fl->no_of_outputs; ++output) {
-		fl->output_values[output] = -180.0f + 60.0f * output;
+		fl->output_values[output] = forceLevels[output];
 	}
 
 	// The global fuzzy system is zero-initialized. Release an earlier rule

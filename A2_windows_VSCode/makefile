@@ -19,4 +19,3 @@ graphics.o		:	 graphics.cpp graphics.h
 clean:
 	del *.o
 	del *.exe
-
