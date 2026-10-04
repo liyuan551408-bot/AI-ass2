@@ -1,0 +1,8 @@
+
+# smart-context generated index
+cache/
+**/cache/
+**/~$*
+*.exe
+*.o
+tmp/
